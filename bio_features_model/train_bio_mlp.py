@@ -45,11 +45,11 @@ def main():
     print("Loading extracted features...")
     
     # Load the CSV you generated in the previous step
-    df = pd.read_csv("./train_bio_features.csv")
+    df = pd.read_csv("./train_bio_features_9_attrs.csv")
     
     # Separate features and labels
     # We drop 'filename' because it's a string, and 'label' is our target
-    X = df[['jitter', 'shimmer', 'hnr']].values
+    X = df[['j_local', 'j_abs', 'j_rap', 'j_ppq5', 's_local', 's_db', 's_apq3', 's_apq5', 'hnr']].values
     y = df['label'].values
     
     # Scale the features (crucial for neural networks so one large value doesn't dominate)

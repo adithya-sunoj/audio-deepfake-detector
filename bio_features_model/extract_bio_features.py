@@ -21,12 +21,12 @@ FLAC_DIR = os.path.join(
 )
 
 # Output CSV to save your features
-OUTPUT_CSV = os.path.join(BASE_DIR, "train_bio_features.csv")
+OUTPUT_CSV = os.path.join(BASE_DIR, "train_bio_features_9_attrs.csv")
 
 # --- 2. Define the Feature Extraction Function ---
-def extract_jsh(audio_path, f0min=75, f0max=600):
+def extract_jsh_9_attrs(audio_path, f0min=75, f0max=600):
     """
-    Extracts Jitter, Shimmer, and HNR using Praat's Parselmouth.
+    Extracts 4 Jitter, 4 Shimmer, and 1 HNR attributes using Praat's Parselmouth.
     """
     try:
         # Load the sound file
@@ -36,32 +36,38 @@ def extract_jsh(audio_path, f0min=75, f0max=600):
         point_process = call(sound, "To PointProcess (periodic, cc)", f0min, f0max)
         harmonicity = call(sound, "To Harmonicity (cc)", 0.01, f0min, 0.1, 1.0)
         
-        # Get Jitter (local)
-        jitter = call(point_process, "Get jitter (local)", 0, 0, 0.0001, 0.02, 1.3)
+        # --- 4 Jitter Variations ---
+        j_local = call(point_process, "Get jitter (local)", 0, 0, 0.0001, 0.02, 1.3)
+        j_abs   = call(point_process, "Get jitter (local, absolute)", 0, 0, 0.0001, 0.02, 1.3)
+        j_rap   = call(point_process, "Get jitter (rap)", 0, 0, 0.0001, 0.02, 1.3)
+        j_ppq5  = call(point_process, "Get jitter (ppq5)", 0, 0, 0.0001, 0.02, 1.3)
         
-        # Get Shimmer (local)
-        shimmer = call([sound, point_process], "Get shimmer (local)", 0, 0, 0.0001, 0.02, 1.3, 1.6)
+        # --- 4 Shimmer Variations ---
+        s_local = call([sound, point_process], "Get shimmer (local)", 0, 0, 0.0001, 0.02, 1.3, 1.6)
+        s_db    = call([sound, point_process], "Get shimmer (local_dB)", 0, 0, 0.0001, 0.02, 1.3, 1.6)
+        s_apq3  = call([sound, point_process], "Get shimmer (apq3)", 0, 0, 0.0001, 0.02, 1.3, 1.6)
+        s_apq5  = call([sound, point_process], "Get shimmer (apq5)", 0, 0, 0.0001, 0.02, 1.3, 1.6)
         
-        # Get HNR (mean)
+        # --- 1 Harmonics-to-Noise Ratio ---
         hnr = call(harmonicity, "Get mean", 0, 0)
         
-        return jitter, shimmer, hnr
+        return j_local, j_abs, j_rap, j_ppq5, s_local, s_db, s_apq3, s_apq5, hnr
+        
     except Exception as e:
-        # If the audio contains no pitch/voice, Praat may fail to find these values
-        return np.nan, np.nan, np.nan
+        # If the audio contains no pitch/voice, Praat fails. Return 9 NaNs.
+        return (np.nan,) * 9
 
 # --- 3. Load Labels and Process Files ---
 def main():
     print("Loading ASVspoof 2019 LA protocol file...")
     
-    # The protocol file is space-separated with 5 columns: 
-    # Speaker_ID | Audio_File_Name | Environment_ID | Attack_ID | Key (bonafide/spoof)
+    # The protocol file is space-separated with 5 columns
     labels_df = pd.read_csv(
         PROTOCOL_FILE, sep=" ", header=None, 
         names=["speaker_id", "filename", "env", "attack", "label"]
     )
     
-    # Filter just what we need: filename and label
+    # Filter just what we need
     labels_df = labels_df[["filename", "label"]]
     
     # Convert 'bonafide' (real) to 1, and 'spoof' (fake) to 0
@@ -71,7 +77,7 @@ def main():
     
     print(f"Starting feature extraction for {len(labels_df)} files...")
     
-    # Iterate through each row in the protocol dataframe using tqdm for a progress bar
+    # Iterate through each row in the protocol dataframe
     for index, row in tqdm(labels_df.iterrows(), total=len(labels_df)):
         file_id = row["filename"]
         target = row["target"]
@@ -80,13 +86,19 @@ def main():
         audio_path = os.path.join(FLAC_DIR, f"{file_id}.flac")
         
         if os.path.exists(audio_path):
-            # Extract features
-            jitter, shimmer, hnr = extract_jsh(audio_path)
+            # Extract the 9 features
+            j_local, j_abs, j_rap, j_ppq5, s_local, s_db, s_apq3, s_apq5, hnr = extract_jsh_9_attrs(audio_path)
             
             features_list.append({
                 "filename": file_id,
-                "jitter": jitter,
-                "shimmer": shimmer,
+                "j_local": j_local,
+                "j_abs": j_abs,
+                "j_rap": j_rap,
+                "j_ppq5": j_ppq5,
+                "s_local": s_local,
+                "s_db": s_db,
+                "s_apq3": s_apq3,
+                "s_apq5": s_apq5,
                 "hnr": hnr,
                 "label": target
             })
@@ -96,8 +108,7 @@ def main():
     # --- 4. Save to Tabular Format ---
     df_features = pd.DataFrame(features_list)
     
-    # Some files might have yielded NaN if they were entirely silent or unvoiced.
-    # We can fill these with 0 or the column mean so the ML model doesn't crash.
+    # Handle files that yielded NaN due to being unvoiced
     df_features.fillna(0, inplace=True) 
     
     df_features.to_csv(OUTPUT_CSV, index=False)
