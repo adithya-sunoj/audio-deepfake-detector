@@ -34,8 +34,7 @@ class BioMLP(nn.Module):
             nn.Linear(16, 8),
             nn.ReLU(),
             
-            nn.Linear(8, 1),
-            nn.Sigmoid()        # Outputs a probability between 0 and 1
+            nn.Linear(8, 1)
         )
 
     def forward(self, x):
@@ -70,8 +69,14 @@ def main():
     # Initialize the model, loss function, and optimizer
     input_dim = X_train.shape[1] # Will be 3 (jitter, shimmer, hnr)
     model = BioMLP(input_dim)
-    
-    criterion = nn.BCELoss() # Binary Cross Entropy for Real vs. Fake
+        
+    # Calculate the ratio of Fake (0) vs Real (1) in the training set
+    num_reals = (y_train == 1).sum()
+    num_fakes = (y_train == 0).sum()
+    pos_weight = torch.tensor([num_fakes / num_reals], dtype=torch.float32)
+
+    # Use BCEWithLogitsLoss which takes un-sigmoid outputs and handles weights
+    criterion = nn.BCEWithLogitsLoss(pos_weight=pos_weight) 
     optimizer = optim.Adam(model.parameters(), lr=0.001)
     
     epochs = 20
