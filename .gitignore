@@ -1,2 +1,8 @@
+*.csv
+*.pt
+*.pkl
+*.flac
+*.wav
 data/
 venv/
+__pycache__/
