@@ -57,7 +57,7 @@ def main():
     X_scaled = scaler.fit_transform(X)
     
     # Split 80% for training and 20% for validation
-    X_train, X_val, y_train, y_val = train_test_split(X_scaled, y, test_size=0.2, random_state=42)
+    X_train, X_val, y_train, y_val = train_test_split(X_scaled, y, test_size=0.2, random_state=42, stratify = y)
     
     # Create DataLoaders
     train_dataset = BioFeatureDataset(X_train, y_train)
