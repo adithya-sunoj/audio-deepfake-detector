@@ -1,0 +1,4 @@
+{
+  "ssl_weight": 0.95,
+  "bio_weight": 0.05
+}
